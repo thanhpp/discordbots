@@ -1,4 +1,4 @@
-package infra
+package hustcrawler
 
 import (
 	"github.com/gocolly/colly/v2"
