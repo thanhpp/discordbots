@@ -8,7 +8,7 @@ import (
 
 func NewBot() (*discordbot.Bot, error) {
 	var (
-		configPath = "./discordbot-secret.yml"
+		configPath = "/home/thanhpp/go/src/github.com/thanhpp/discordbots/cmd/discordbotcmd/discordbot-secret.yml"
 		botName    = "test-bot"
 	)
 

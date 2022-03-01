@@ -9,9 +9,10 @@ import (
 )
 
 type BotConfig struct {
-	AppID     string `mapstructure:"AppID"`
-	PublicKey string `mapstructure:"PublicKey"`
-	BotToken  string `mapstructure:"BotToken"`
+	AppID          string `mapstructure:"AppID"`
+	PublicKey      string `mapstructure:"PublicKey"`
+	BotToken       string `mapstructure:"BotToken"`
+	WeatherChannel string `mapstructure:"WeatherChannel"`
 }
 
 func NewConfigFromFile(p string) (*BotConfig, error) {

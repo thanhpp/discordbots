@@ -2,19 +2,22 @@ package discordbot
 
 import (
 	"context"
+	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/thanhpp/discordbots/pkg/weathercrawler"
 )
 
 type Bot struct {
-	name    string
-	token   string
-	session *discordgo.Session
-	mainCtx context.Context
+	name          string
+	token         string
+	session       *discordgo.Session
+	mainCtx       context.Context
+	mainCtxCancel context.CancelFunc
+	receiveChan   chan *Message
+	alerts        []*Alert
 }
 
 func NewBot(name, token string) (*Bot, error) {
@@ -23,14 +26,22 @@ func NewBot(name, token string) (*Bot, error) {
 		return nil, err
 	}
 
+	mainCtx, mainCtxCancel := context.WithCancel(context.Background())
+
 	bot := &Bot{
-		name:    name,
-		token:   token,
-		session: s,
-		mainCtx: context.Background(),
+		name:          name,
+		token:         token,
+		session:       s,
+		mainCtx:       mainCtx,
+		mainCtxCancel: mainCtxCancel,
+		receiveChan:   make(chan *Message),
 	}
 
 	return bot, nil
+}
+
+func (b Bot) Name() string {
+	return b.name
 }
 
 func (b *Bot) Start() error {
@@ -39,18 +50,32 @@ func (b *Bot) Start() error {
 		return err
 	}
 
-	weatherCrw := weathercrawler.NewWeatherCrawler()
-	weatherInfo := weatherCrw.GetInfoNow()
-	msg := new(Message)
-	msg.Topic = "[HANOI WEATHER INFO]"
-	msg.AddContent("TMP", weatherInfo.Temperature)
-	msg.AddContent("STA", weatherInfo.Status)
-	msg.AddContent("HMD", weatherInfo.Humidity)
-	msg.AddContent("UPD", weatherInfo.LastUpdated)
-	b.sendMessage("947185195575021669", msg.Stringtify())
+	for i := range b.alerts {
+		go b.alerts[i].Start()
+	}
+
+	go func() {
+		for {
+			select {
+			case msg := <-b.receiveChan:
+				if err := b.sendMessage(msg.ChannelID, msg.Stringtify()); err != nil {
+					log.Println("err sending alert message", err, msg)
+					continue
+				}
+				log.Println("Sent msg from alert")
+
+			case <-b.mainCtx.Done():
+				log.Println("Stop receiving alert message")
+				return
+			}
+		}
+	}()
 
 	defer func(er *error) {
+		b.mainCtxCancel()
 		*er = b.session.Close()
+		close(b.receiveChan)
+		log.Println("Bot stopped")
 	}(&err)
 
 	sc := make(chan os.Signal, 1)

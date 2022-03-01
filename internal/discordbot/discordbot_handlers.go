@@ -27,7 +27,3 @@ func (b *Bot) sendMessage(channelID, message string) error {
 	_, err := b.session.ChannelMessageSend(channelID, message)
 	return err
 }
-
-func (b *Bot) NewAlert() {
-
-}

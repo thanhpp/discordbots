@@ -3,8 +3,9 @@ package discordbot
 import "strings"
 
 type Message struct {
-	Topic   string
-	Content []*MsgField
+	ChannelID string
+	Topic     string
+	Content   []*MsgField
 }
 
 type MsgField struct {
