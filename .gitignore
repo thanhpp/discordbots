@@ -16,3 +16,4 @@
 *.secret.yml
 *-secret.yml
 cmd/discordbotcmd/discordbotcmd
+cmd/discordbotcmd/discordbotcmd.pi-ver

@@ -2,7 +2,6 @@ package discordbot
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"sync"
 )
@@ -50,20 +49,14 @@ func (a *Alert) Ctx() context.Context {
 }
 
 func (a *Alert) Start() {
-	// send a new message to notify
-	a.receiveChan <- &Message{
-		ChannelID: a.channelID,
-		Topic:     fmt.Sprintf("[Alert] %s started", a.name),
-	}
-
-	msgChan := a.msgGen(a.ctx)
+	msgC := a.msgGen(a.ctx)
 	for {
 		select {
 		case <-a.ctx.Done():
 			log.Printf("[Alert] %s is stopped", a.name)
 			a.Cancel()
 			return
-		case msg := <-msgChan:
+		case msg := <-msgC:
 			a.receiveChan <- msg
 		}
 	}

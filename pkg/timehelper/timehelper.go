@@ -16,6 +16,10 @@ var (
 	ErrNilTimeCond = errors.New("nil time cond")
 )
 
+var (
+	DefaultTimeCond = &TimeCond{0, 0, 0}
+)
+
 type TimeCond struct {
 	hour int
 	min  int
@@ -36,6 +40,16 @@ func NewTimeCond(hour, min, sec int) (*TimeCond, error) {
 	}
 
 	return &TimeCond{hour, min, sec}, nil
+}
+
+// MustNewTimeCond is like NewTimeCond, but returns DefaultTimeCond if the given time cond is invalid.
+func MustNewTimeCond(hour, min, sec int) *TimeCond {
+	t, err := NewTimeCond(hour, min, sec)
+	if err != nil {
+		return DefaultTimeCond
+	}
+
+	return t
 }
 
 func UntilNextTimeCond(t time.Time, timeCond *TimeCond) (time.Duration, error) {

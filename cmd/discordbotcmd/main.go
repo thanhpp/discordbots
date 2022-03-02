@@ -30,7 +30,7 @@ func main() {
 	if err := bot.Start(); err != nil {
 		panic(errors.WithMessage(err, "Start a bot"))
 	}
-	log.Printf("Bot %s stopped \n", bot.Name())
+	log.Printf("Bot %s stopped \n\n\n", bot.Name())
 }
 
 func addWeatherAlert(bot *discordbot.Bot, channelID string) {
@@ -42,39 +42,32 @@ func addWeatherAlert(bot *discordbot.Bot, channelID string) {
 
 			go func() {
 				// wait
-				timeCond1, err := timehelper.NewTimeCond(0, 0, 0)
-				if err != nil {
-					panic(err)
-				}
-
-				timeCond2, err := timehelper.NewTimeCond(6, 0, 0)
-				if err != nil {
-					panic(err)
-				}
-
-				timeCond3, err := timehelper.NewTimeCond(12, 0, 0)
-				if err != nil {
-					panic(err)
-				}
-
-				timeCond4, err := timehelper.NewTimeCond(18, 0, 0)
-				if err != nil {
-					panic(err)
-				}
+				timeCond1 := timehelper.MustNewTimeCond(0, 0, 0)
+				timeCond2 := timehelper.MustNewTimeCond(6, 0, 0)
+				timeCond3 := timehelper.MustNewTimeCond(12, 0, 0)
+				timeCond4 := timehelper.MustNewTimeCond(18, 0, 0)
 
 				waitDur, err := timehelper.ShortestUntilNextTimeCond(time.Now(), timeCond1, timeCond2, timeCond3, timeCond4)
 				if err != nil {
 					panic(err)
 				}
 
+				log.Printf("[Weather alert] Wait %f mins to start \n", waitDur.Minutes())
 				<-time.After(waitDur)
+				log.Printf("[Weather alert] Start\n")
 
 				var (
 					toSend       = false
 					toSendTicker = time.NewTicker(time.Hour * 6)
-					crawlTicker  = time.NewTicker(time.Minute * 5)
+					crawlTicker  = time.NewTicker(time.Minute * 10)
 					weatherCrw   = weathercrawler.NewWeatherCrawler()
 				)
+
+				// first message, due to the ticker starts after its interval
+				msg := parseWeatherMsg(weatherCrw)
+				msg.ChannelID = channelID
+				log.Printf("[Weather alert] Send message: %+v \n", msg)
+				returnC <- msg
 
 				for {
 					select {
@@ -85,21 +78,18 @@ func addWeatherAlert(bot *discordbot.Bot, channelID string) {
 						return
 
 					case <-toSendTicker.C:
+						log.Println("[DEBUG] Update toSend ticker")
 						toSend = true
 
 					case <-crawlTicker.C:
 						if !toSend {
 							continue
 						}
-						weatherNow := weatherCrw.GetInfoNow()
-						msg := new(discordbot.Message)
+						msg := parseWeatherMsg(weatherCrw)
 						msg.ChannelID = channelID
-						msg.Topic = "HANOI WEATHER INFO"
-						msg.AddContent("TMP", weatherNow.Temperature)
-						msg.AddContent("STT", weatherNow.Status)
-						msg.AddContent("HMD", weatherNow.Humidity)
-						msg.AddContent("UPD", weatherNow.LastUpdated)
-						toSend = true
+						log.Printf("[Weather alert] Send message: %+v \n", msg)
+						returnC <- msg
+						toSend = false
 					}
 				}
 			}()
@@ -107,4 +97,17 @@ func addWeatherAlert(bot *discordbot.Bot, channelID string) {
 			return returnC
 		},
 	)
+}
+
+func parseWeatherMsg(crwl *weathercrawler.WeatherCrawler) *discordbot.Message {
+	log.Println("[DEBUG] Crawling weather....")
+	weatherNow := crwl.GetInfoNow()
+	msg := new(discordbot.Message)
+	msg.Topic = "HANOI WEATHER INFO"
+	msg.AddContent("TMP", weatherNow.Temperature)
+	msg.AddContent("STT", weatherNow.Status)
+	msg.AddContent("HMD", weatherNow.Humidity)
+	msg.AddContent("UPD", weatherNow.LastUpdated)
+
+	return msg
 }
