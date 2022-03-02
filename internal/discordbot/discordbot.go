@@ -2,12 +2,12 @@ package discordbot
 
 import (
 	"context"
-	"log"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/thanhpp/discordbots/pkg/logger"
 )
 
 type Bot struct {
@@ -59,23 +59,24 @@ func (b *Bot) Start() error {
 			select {
 			case msg := <-b.receiveChan:
 				if err := b.sendMessage(msg.ChannelID, msg.Stringtify()); err != nil {
-					log.Println("err sending alert message", err, msg)
+					logger.Get().Errorf("err sending alert message", err, msg)
 					continue
 				}
-				log.Println("Sent msg from alert")
+				// logger.Get().Debug("Sent msg from alert") - Otherwise, the discord log channel will be flooded with duplicate messages
 
 			case <-b.mainCtx.Done():
-				log.Println("Stop receiving alert message")
+				logger.Get().Info("Stop receiving alert message")
 				return
 			}
 		}
 	}()
 
 	defer func(er *error) {
+		logger.Get().Infof("Bot stopping....")
 		b.mainCtxCancel()
 		*er = b.session.Close()
 		close(b.receiveChan)
-		log.Println("Bot stopped")
+		logger.Get().Debugf("Bot stopped")
 	}(&err)
 
 	sc := make(chan os.Signal, 1)

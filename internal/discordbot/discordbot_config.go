@@ -13,6 +13,7 @@ type BotConfig struct {
 	PublicKey      string `mapstructure:"PublicKey"`
 	BotToken       string `mapstructure:"BotToken"`
 	WeatherChannel string `mapstructure:"WeatherChannel"`
+	LogChannel     string `mapstructure:"LogChannel"`
 }
 
 func NewConfigFromFile(p string) (*BotConfig, error) {

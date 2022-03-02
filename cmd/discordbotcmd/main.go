@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/thanhpp/discordbots/internal/discordbot"
+	"github.com/thanhpp/discordbots/pkg/logger"
 	"github.com/thanhpp/discordbots/pkg/timehelper"
 	"github.com/thanhpp/discordbots/pkg/weathercrawler"
 )
@@ -19,18 +20,27 @@ func main() {
 	}
 
 	// setup
-	bot, err := discordbot.NewBot("thanhpp's bot", botCfg.BotToken)
+	logger.Set(&logger.LogConfig{
+		Color:      true,
+		LoggerName: "thanhpp's discordbot",
+		Level:      "DEBUG",
+	}, true)
+
+	bot, err := discordbot.NewBot("thanhpp", botCfg.BotToken)
 	if err != nil {
 		panic(errors.WithMessage(err, "Create a new discord bot"))
 	}
+
+	// adding alert
 	addWeatherAlert(bot, botCfg.WeatherChannel)
+	addLogAlert(bot, botCfg.LogChannel)
 
 	// start the bot
-	log.Printf("Bot %s is starting... \n", bot.Name())
+	logger.Get().Infof("Bot %s is starting...", bot.Name())
 	if err := bot.Start(); err != nil {
-		panic(errors.WithMessage(err, "Start a bot"))
+		logger.Get().Fatalf("%+v", errors.WithMessage(err, "Start a bot"))
 	}
-	log.Printf("Bot %s stopped \n\n\n", bot.Name())
+	logger.Get().Infof("Bot %s stopped", bot.Name())
 }
 
 func addWeatherAlert(bot *discordbot.Bot, channelID string) {
@@ -52,9 +62,9 @@ func addWeatherAlert(bot *discordbot.Bot, channelID string) {
 					panic(err)
 				}
 
-				log.Printf("[Weather alert] Wait %f mins to start \n", waitDur.Minutes())
+				logger.Get().Infof("[Weather alert] Wait %f mins to start", waitDur.Minutes())
 				<-time.After(waitDur)
-				log.Printf("[Weather alert] Start\n")
+				logger.Get().Infof("[Weather alert] Start")
 
 				var (
 					toSend       = false
@@ -64,9 +74,9 @@ func addWeatherAlert(bot *discordbot.Bot, channelID string) {
 				)
 
 				// first message, due to the ticker starts after its interval
-				msg := parseWeatherMsg(weatherCrw)
+				msg, _ := parseWeatherMsg(weatherCrw)
 				msg.ChannelID = channelID
-				log.Printf("[Weather alert] Send message: %+v \n", msg)
+				logger.Get().Debugf("[Weather alert] Send message: %+v", msg)
 				returnC <- msg
 
 				for {
@@ -85,9 +95,13 @@ func addWeatherAlert(bot *discordbot.Bot, channelID string) {
 						if !toSend {
 							continue
 						}
-						msg := parseWeatherMsg(weatherCrw)
+						msg, ok := parseWeatherMsg(weatherCrw)
+						if !ok {
+							logger.Get().Warn("[Weather alert] Failed to parse weather info")
+							continue
+						}
 						msg.ChannelID = channelID
-						log.Printf("[Weather alert] Send message: %+v \n", msg)
+						logger.Get().Debugf("[Weather alert] Send message: %+v", msg)
 						returnC <- msg
 						toSend = false
 					}
@@ -99,9 +113,14 @@ func addWeatherAlert(bot *discordbot.Bot, channelID string) {
 	)
 }
 
-func parseWeatherMsg(crwl *weathercrawler.WeatherCrawler) *discordbot.Message {
-	log.Println("[DEBUG] Crawling weather....")
+func parseWeatherMsg(crwl *weathercrawler.WeatherCrawler) (*discordbot.Message, bool) {
+	logger.Get().Debugf("[DEBUG] Crawling weather....")
 	weatherNow := crwl.GetInfoNow()
+	if len(weatherNow.Temperature) == 0 {
+		log.Println("[ERROR] Empty temparature")
+		return nil, false
+	}
+
 	msg := new(discordbot.Message)
 	msg.Topic = "HANOI WEATHER INFO"
 	msg.AddContent("TMP", weatherNow.Temperature)
@@ -109,5 +128,34 @@ func parseWeatherMsg(crwl *weathercrawler.WeatherCrawler) *discordbot.Message {
 	msg.AddContent("HMD", weatherNow.Humidity)
 	msg.AddContent("UPD", weatherNow.LastUpdated)
 
-	return msg
+	return msg, true
+}
+
+func addLogAlert(bot *discordbot.Bot, channelID string) {
+	bot.NewAlert(
+		"Log Alert",
+		channelID,
+		func(alertCtx context.Context) chan *discordbot.Message {
+			var logC = make(chan *discordbot.Message)
+
+			go func() {
+				for {
+					select {
+					case <-alertCtx.Done():
+						return
+
+					case logMsg := <-logger.Get().OutputC():
+						// create new log message
+						msg := new(discordbot.Message)
+						msg.ChannelID = channelID
+						msg.Topic = "LOG"
+						msg.AddContent("Content", logMsg)
+						logC <- msg
+					}
+				}
+			}()
+
+			return logC
+		},
+	)
 }

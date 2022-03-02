@@ -11,8 +11,9 @@ type WeatherCrawler struct {
 }
 
 func NewWeatherCrawler() *WeatherCrawler {
+	c := colly.NewCollector()
 	return &WeatherCrawler{
-		collector: colly.NewCollector(),
+		collector: c,
 	}
 }
 
@@ -47,13 +48,11 @@ func (w *WeatherCrawler) GetInfoNow() *WeatherInfo {
 	var infoNow = new(WeatherInfo)
 
 	// #wrapper > div > div.uk-container > section > div > div > article > div > div > div.content-news.fix-content-news > div > div > div:nth-child(2) > div
-
 	w.collector.OnHTML("div.content-news.fix-content-news > div > div > div:nth-child(2) > div", func(h *colly.HTMLElement) {
 		if err := h.Unmarshal(infoNow); err != nil {
 			return
 		}
 	})
-
 	w.collector.Visit(hanoiWeather)
 
 	infoNow.Beautify()

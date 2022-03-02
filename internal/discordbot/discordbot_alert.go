@@ -2,8 +2,9 @@ package discordbot
 
 import (
 	"context"
-	"log"
 	"sync"
+
+	"github.com/thanhpp/discordbots/pkg/logger"
 )
 
 type AlertMsgGenerator func(alertCtx context.Context) chan *Message
@@ -53,7 +54,7 @@ func (a *Alert) Start() {
 	for {
 		select {
 		case <-a.ctx.Done():
-			log.Printf("[Alert] %s is stopped", a.name)
+			logger.Get().Infof("[Alert] %s is stopped", a.name)
 			a.Cancel()
 			return
 		case msg := <-msgC:

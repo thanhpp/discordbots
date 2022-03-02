@@ -8,7 +8,9 @@ import (
 )
 
 func TestWeatherCrawler(t *testing.T) {
-	w := weathercrawler.NewWeatherCrawler()
+	for i := 0; i < 10; i++ {
+		w := weathercrawler.NewWeatherCrawler()
 
-	fmt.Printf("%+v", w.GetInfoNow())
+		fmt.Printf("%+v \n", w.GetInfoNow())
+	}
 }
