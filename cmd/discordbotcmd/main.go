@@ -12,6 +12,10 @@ import (
 	"github.com/thanhpp/discordbots/pkg/weathercrawler"
 )
 
+var (
+	enableDiscordLog bool = true
+)
+
 func main() {
 	// read config
 	botCfg, err := discordbot.NewConfigFromFile("discordbot-secret.yml")
@@ -24,7 +28,7 @@ func main() {
 		Color:      true,
 		LoggerName: "thanhpp's discordbot",
 		Level:      "DEBUG",
-	}, true)
+	}, enableDiscordLog)
 
 	bot, err := discordbot.NewBot("thanhpp", botCfg.BotToken)
 	if err != nil {
@@ -33,7 +37,9 @@ func main() {
 
 	// adding alert
 	addWeatherAlert(bot, botCfg.WeatherChannel)
-	addLogAlert(bot, botCfg.LogChannel)
+	if enableDiscordLog {
+		addLogAlert(bot, botCfg.LogChannel)
+	}
 
 	// start the bot
 	logger.Get().Infof("Bot %s is starting...", bot.Name())
@@ -56,13 +62,14 @@ func addWeatherAlert(bot *discordbot.Bot, channelID string) {
 				timeCond2 := timehelper.MustNewTimeCond(6, 0, 0)
 				timeCond3 := timehelper.MustNewTimeCond(12, 0, 0)
 				timeCond4 := timehelper.MustNewTimeCond(18, 0, 0)
+				testTimeCond := timehelper.MustNewTimeCond(0, 0, 0)
 
-				waitDur, err := timehelper.ShortestUntilNextTimeCond(time.Now(), timeCond1, timeCond2, timeCond3, timeCond4)
+				waitDur, err := timehelper.ShortestUntilNextTimeCond(time.Now(), timeCond1, timeCond2, timeCond3, timeCond4, testTimeCond)
 				if err != nil {
 					panic(err)
 				}
 
-				logger.Get().Infof("[Weather alert] Wait %f mins to start", waitDur.Minutes())
+				logger.Get().Infof("[Weather alert] Wait %.2f mins to start", waitDur.Minutes())
 				<-time.After(waitDur)
 				logger.Get().Infof("[Weather alert] Start")
 
@@ -117,7 +124,12 @@ func parseWeatherMsg(crwl *weathercrawler.WeatherCrawler) (*discordbot.Message, 
 	logger.Get().Debugf("[DEBUG] Crawling weather....")
 	weatherNow := crwl.GetInfoNow()
 	if len(weatherNow.Temperature) == 0 {
-		log.Println("[ERROR] Empty temparature")
+		log.Println("[ERROR] Empty temparature - 1")
+		return nil, false
+	}
+
+	if weatherNow.Temperature == "°C" {
+		logger.Get().Warn("[ERROR] Empty temparature - 2")
 		return nil, false
 	}
 
@@ -141,9 +153,6 @@ func addLogAlert(bot *discordbot.Bot, channelID string) {
 			go func() {
 				for {
 					select {
-					case <-alertCtx.Done():
-						return
-
 					case logMsg := <-logger.Get().OutputC():
 						// create new log message
 						msg := new(discordbot.Message)
@@ -151,6 +160,9 @@ func addLogAlert(bot *discordbot.Bot, channelID string) {
 						msg.Topic = "LOG"
 						msg.AddContent("Content", logMsg)
 						logC <- msg
+
+					case <-alertCtx.Done():
+						return
 					}
 				}
 			}()
